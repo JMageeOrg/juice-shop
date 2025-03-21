@@ -53,9 +53,13 @@ jobs:
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/kubectl
 
+      # 5. Reset kubeconfig to remove any old configuration
+      - name: Reset kubeconfig
+        run: rm -f $HOME/.kube/config
+
       # 6. Update kubeconfig to point to your EKS cluster
       - name: Update kubeconfig
-        run: aws eks update-kubeconfig --region us-east-1 --name YOUR_CLUSTER_NAME
+        run: aws eks update-kubeconfig --region us-east-1 --name jmlab-eks-cluster
 
       # 6a. Rename kubeconfig user to your IAM user "github-eks-deploy"
       - name: Rename kubeconfig user
