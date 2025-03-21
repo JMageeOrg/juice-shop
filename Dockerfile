@@ -3,7 +3,7 @@
 ##
 FROM node:18 as installer
 
-# Install build tools for native modules (python3, make, g++)
+# Install build tools (python3, make, g++) for native modules
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
@@ -13,12 +13,12 @@ RUN apt-get update && apt-get install -y \
 # Set our working directory
 WORKDIR /juice-shop
 
-# Copy package manifests first (for better caching)
+# Copy package manifests first (for caching)
 COPY package*.json ./
 
 # Install all dependencies (including dev) so we can run the Angular build.
-# Since you don't have a package-lock.json, we use npm install.
-RUN npm install --unsafe-perm --legacy-peer-deps --loglevel silly
+# We add --unsafe-perm, --legacy-peer-deps, and --force along with verbose logging.
+RUN npm install --unsafe-perm --legacy-peer-deps --force --loglevel silly
 
 # Copy the rest of the source code
 COPY . /juice-shop
@@ -30,7 +30,7 @@ RUN npm run build
 RUN npm prune --omit=dev
 RUN npm dedupe
 
-# Remove large/unneeded folders and files
+# Remove unneeded folders and files
 RUN rm -rf frontend/node_modules \
            frontend/.angular \
            frontend/src/assets
@@ -47,7 +47,7 @@ RUN rm i18n/*.json || true
 ##
 FROM gcr.io/distroless/nodejs:18
 
-# Optional ARGs for metadata
+# Optional ARGs (metadata)
 ARG BUILD_DATE
 ARG VCS_REF
 LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
@@ -63,17 +63,7 @@ LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
       org.opencontainers.image.revision=$VCS_REF \
       org.opencontainers.image.created=$BUILD_DATE
 
-# Set the working directory (same as the build stage)
+# Use the same working directory as in the build stage
 WORKDIR /juice-shop
 
-# Copy everything from the build stage, preserving ownership for non-root user
-COPY --from=installer --chown=65532:0 /juice-shop .
-
-# Run as non-root user from the distroless image
-USER 65532
-
-# Expose port 3000
-EXPOSE 3000
-
-# Start the application
-CMD ["/juice-shop/build/app.js"]
+# Copy built application from the 
