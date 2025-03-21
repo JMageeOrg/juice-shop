@@ -58,7 +58,7 @@ jobs:
 
       # 7. Update kubeconfig to point to your EKS cluster (replace YOUR_CLUSTER_NAME)
       - name: Update kubeconfig
-        run: aws eks update-kubeconfig --region us-east-1 --name YOUR_CLUSTER_NAME
+        run: aws eks update-kubeconfig --region us-east-1 --name jmlab-eks-cluster
 
       # (Removed the step that manually sets the kubeconfig context user)
 
