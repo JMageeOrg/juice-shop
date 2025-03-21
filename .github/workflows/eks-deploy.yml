@@ -23,7 +23,7 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v3
 
-      # 2. Set up Node.js 18 (for npm tasks)
+      # 2. Set up Node.js 18 (if needed for npm tasks)
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
@@ -51,19 +51,20 @@ jobs:
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/kubectl
 
-      # 6. Reset kubeconfig to remove any old configuration
+      # 6. Reset any old kubeconfig file
       - name: Reset kubeconfig
         run: rm -f $HOME/.kube/config
 
       # 7. Update kubeconfig to point to your EKS cluster
       - name: Update kubeconfig
-        run: aws eks update-kubeconfig --region us-east-1 --name jmlab-eks-cluster
-
-      # 8. Debug: Print kubeconfig contents to verify valid credentials (remove after debugging)
-      - name: Debug kubeconfig
         run: |
-          echo "Kubeconfig contents:"
-          kubectl config view
+          aws eks update-kubeconfig --region us-east-1 --name jmla-eks-cluster
+          echo "Kubeconfig (minified):"
+          kubectl config view --minify
+
+      # 8. Verify connectivity to the cluster (this should list pods)
+      - name: Verify cluster connectivity
+        run: kubectl get pods --all-namespaces
 
       # 9. Build Docker image (using your Dockerfile)
       - name: Build Docker image
