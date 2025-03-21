@@ -74,9 +74,10 @@ jobs:
           docker tag juice-shop:latest 285653935315.dkr.ecr.us-east-1.amazonaws.com/jm-lab/juiceshop:$IMAGE_TAG
           docker push 285653935315.dkr.ecr.us-east-1.amazonaws.com/jm-lab/juiceshop:$IMAGE_TAG
 
-      # 10. Deploy to EKS by updating the existing Kubernetes Deployment
+       # 10. Deploy to EKS by updating the existing Kubernetes Deployment
       - name: Deploy to EKS
         run: |
           IMAGE_TAG=${{ github.sha }}
-          kubectl set image deployment/jm-lab/juice-shop \
+          kubectl set image deployment/juice-shop -n jm-lab \
             juice-shop=285653935315.dkr.ecr.us-east-1.amazonaws.com/jm-lab/juiceshop:$IMAGE_TAG
+
