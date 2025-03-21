@@ -1,85 +1,80 @@
-name: Deploy to EKS
+##
+# 1) Build/Installer Stage
+##
+FROM node:18 as installer
 
-on:
-  # Allows manual triggers via the GitHub UI
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Deployment environment'
-        required: true
-        default: 'production'
-      version:
-        description: 'App version to deploy'
-        required: false
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+# Install build tools (Python, make, g++) for native npm modules
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+  && rm -rf /var/lib/apt/lists/*
 
-jobs:
-  build_and_deploy:
-    runs-on: ubuntu-latest
-    steps:
-      # 1) Check out the source code
-      - name: Check out the repository
-        uses: actions/checkout@v3
+# Set our working directory
+WORKDIR /juice-shop
 
-      # 2) Set up Node.js 18 (only needed if you have npm/Node build steps)
-      - name: Use Node.js 18
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18.x'
+# Copy package manifests first (for better caching of npm install)
+COPY package*.json ./
 
-      # 3) Install and build steps (adjust as needed for your project)
-      - name: Install dependencies
-        run: |
-          npm install --save-dev typescript@^4.9.5
-          cd frontend
-          npm install --legacy-peer-deps
+# Install all dependencies (including dev) so we can run the Angular build
+# Use --unsafe-perm to allow install scripts to run as root, --loglevel silly for detailed logs
+RUN npm install --unsafe-perm --loglevel silly
 
-      # 4) Configure AWS credentials using static keys (no assume-role, no audience)
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1  # change if your cluster/ECR is in a different region
+# Copy the rest of the source code
+COPY . /juice-shop
 
-      # 5) Install kubectl
-      - name: Install kubectl
-        run: |
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/kubectl
+# Build the application (frontend & server)
+RUN npm run build
 
-      # 6) Update kubeconfig to point to your EKS cluster
-      #    Replace 'my-eks-cluster' with your actual cluster name
-      - name: Update kubeconfig
-        run: aws eks update-kubeconfig --region us-east-1 --name jmlab-eks-cluster
+# Remove dev dependencies to minimize final image size
+RUN npm prune --omit=dev
+RUN npm dedupe
 
-      # 7) Build Docker image
-      - name: Build Docker image
-        run: |
-          docker build -t juice-shop:latest .
+# Remove large/unneeded folders and files
+RUN rm -rf frontend/node_modules
+RUN rm -rf frontend/.angular
+RUN rm -rf frontend/src/assets
+RUN mkdir logs
+RUN chown -R 65532 logs
+RUN chgrp -R 0 ftp/ frontend/dist/ logs/ data/ i18n/
+RUN chmod -R g=u ftp/ frontend/dist/ logs/ data/ i18n/
+RUN rm data/chatbot/botDefaultTrainingData.json || true
+RUN rm ftp/legal.md || true
+RUN rm i18n/*.json || true
 
-      # 8) Log in to Amazon ECR
-      - name: Log in to ECR
-        run: |
-          aws ecr get-login-password --region us-east-1 | \
-            docker login --username AWS --password-stdin jm-lab
 
-      # 9) Tag and push Docker image to ECR
-      #    If your ECR repository is named something else, change 'jm-lab/juiceshop'
-      - name: Tag and push Docker image
-        run: |
-          IMAGE_TAG=${{ github.sha }}
-          docker tag juice-shop:latest jm-lab/juiceshop:$IMAGE_TAG
-          docker push jm-lab/juiceshop:$IMAGE_TAG
+##
+# 2) Production Runtime Stage
+##
+FROM gcr.io/distroless/nodejs:18
 
-      # 10) Deploy to EKS by updating an existing Deployment
-      #     Replace 'juice-shop' with the name of your Kubernetes Deployment if different
-      - name: Deploy to EKS
-        run: |
-          IMAGE_TAG=${{ github.sha }}
-          kubectl set image deployment/juice-shop \
-            juice-shop=jm-lab/juiceshop:$IMAGE_TAG
+# These ARGs (labels) are optional metadata
+ARG BUILD_DATE
+ARG VCS_REF
+LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
+    org.opencontainers.image.title="OWASP Juice Shop" \
+    org.opencontainers.image.description="Probably the most modern and sophisticated insecure web application" \
+    org.opencontainers.image.authors="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
+    org.opencontainers.image.vendor="Open Web Application Security Project" \
+    org.opencontainers.image.documentation="https://help.owasp-juice.shop" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.version="15.0.0" \
+    org.opencontainers.image.url="https://owasp-juice.shop" \
+    org.opencontainers.image.source="https://github.com/juice-shop/juice-shop" \
+    org.opencontainers.image.revision=$VCS_REF \
+    org.opencontainers.image.created=$BUILD_DATE
+
+# Same working directory as the build stage
+WORKDIR /juice-shop
+
+# Copy everything from the build stage, preserving ownership (65532) for non-root user
+COPY --from=installer --chown=65532:0 /juice-shop .
+
+# Use a non-root user from distroless
+USER 65532
+
+# Expose port 3000 by default
+EXPOSE 3000
+
+# Start the Node app
+CMD ["/juice-shop/build/app.js"]
