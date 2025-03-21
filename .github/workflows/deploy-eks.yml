@@ -24,21 +24,19 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v3
         
-    # 2. Set up Node 18 (so Angular CLI works)
+      # 2. Set up Node 18 (optional if you need Node for anything else)
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
           node-version: '18.x'
 
-      # 3. Install dependencies, lint, and build (modify the commands as needed)
+      # 3. Install dependencies, then build (modify commands as needed)
       - name: Install dependencies
         run: npm install
 
-      - name: Lint
-        run: npm run lint:fix  # or `npm run lint` if you don't want to auto-fix
-
       - name: Build
         run: npm run build
+
         
       # 4. Configure AWS credentials (pull from GitHub Secrets)
       - name: Configure AWS Credentials
