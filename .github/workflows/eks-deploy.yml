@@ -58,7 +58,7 @@ jobs:
       # 7. Update kubeconfig to point to your EKS cluster
       - name: Update kubeconfig
         run: |
-          aws eks update-kubeconfig --region us-east-1 --name jmla-eks-cluster
+          aws eks update-kubeconfig --region us-east-1 --name jmlab-eks-cluster
           echo "Kubeconfig (minified):"
           kubectl config view --minify
 
