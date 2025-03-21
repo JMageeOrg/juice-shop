@@ -35,7 +35,7 @@ jobs:
         run: |
           npm install --save-dev typescript@^4.9.5
           cd frontend
-          npm install
+          npm install --legacy-peer-deps
 
         
       # 4. Configure AWS credentials (pull from GitHub Secrets)
