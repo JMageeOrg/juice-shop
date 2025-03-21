@@ -54,7 +54,7 @@ jobs:
       - name: Log in to ECR
         run: |
           aws ecr get-login-password --region us-east-1 | \
-            docker login --username AWS --password-stdin YOUR_ECR_REGISTRY
+            docker login --username AWS --password-stdin jm-lab
 
       # 8. Tag and push image to Amazon ECR
       - name: Tag and push Docker image
@@ -62,8 +62,8 @@ jobs:
           # Use SHA or another tag you prefer
           IMAGE_TAG=${{ github.sha }}
           
-          docker tag juice-shop:latest YOUR_ECR_REGISTRY/YOUR_ECR_REPOSITORY:$IMAGE_TAG
-          docker push YOUR_ECR_REGISTRY/YOUR_ECR_REPOSITORY:$IMAGE_TAG
+          docker tag juice-shop:latest jm-lab/juiceshop:$IMAGE_TAG:$IMAGE_TAG
+          docker push jm-lab/juiceshop:$IMAGE_TAG
 
       # 9. Deploy to EKS by updating the existing Kubernetes Deployment
       - name: Deploy to EKS
@@ -71,4 +71,5 @@ jobs:
           # Example: update the 'juice-shop' container in a 'juice-shop' deployment
           IMAGE_TAG=${{ github.sha }}
           kubectl set image deployment/juice-shop \
-            juice-shop=YOUR_ECR_REGISTRY/YOUR_ECR_REPOSITORY:$IMAGE_TAG
+            juice-shop=jm-lab/juiceshop:$IMAGE_TAG
+          ###juice-shop=YOUR_ECR_REGISTRY/YOUR_ECR_REPOSITORY:$IMAGE_TAG jm-lab/juiceshop
