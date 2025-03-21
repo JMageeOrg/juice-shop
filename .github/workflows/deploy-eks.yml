@@ -55,7 +55,7 @@ jobs:
 
       # 6. Update kubeconfig to point to your EKS cluster
       - name: Update kubeconfig
-        run: aws eks update-kubeconfig --region us-east-1 --name YOUR_CLUSTER_NAME
+        run: aws eks update-kubeconfig --region us-east-1 --name jmlab-eks-cluster
 
       # 7. Build Docker image (using your Dockerfile)
       - name: Build Docker image
