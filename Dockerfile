@@ -3,6 +3,13 @@
 ##
 FROM node:18 as installer
 
+# Install build tools if your dependencies need native modules
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+  && rm -rf /var/lib/apt/lists/*
+
 # Set our working directory
 WORKDIR /juice-shop
 
@@ -10,7 +17,8 @@ WORKDIR /juice-shop
 COPY package*.json ./
 
 # Install all dependencies (including dev) so we can run the Angular build
-RUN npm install --unsafe-perm
+# Add --verbose to see more details if 'npm install' fails
+RUN npm install --unsafe-perm --verbose
 
 # Copy the rest of the source code
 COPY . /juice-shop
@@ -33,6 +41,7 @@ RUN chmod -R g=u ftp/ frontend/dist/ logs/ data/ i18n/
 RUN rm data/chatbot/botDefaultTrainingData.json || true
 RUN rm ftp/legal.md || true
 RUN rm i18n/*.json || true
+
 
 ##
 # 2) Production Runtime Stage
@@ -69,4 +78,3 @@ EXPOSE 3000
 
 # Start the Node app
 CMD ["/juice-shop/build/app.js"]
-
