@@ -6,41 +6,36 @@ on:
 
 jobs:
   analyze:
-    name: Analyze
     runs-on: ubuntu-latest
-
     permissions:
       actions: read
       contents: read
       security-events: write
 
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [ 'javascript' ]
-
     steps:
-      # 1) Check out your code
+      # 1) Check out your repository
       - name: Check out repository
         uses: actions/checkout@v3
 
-      # 2) Set up Node.js 18 (so Angular sees the correct version)
+      # 2) Use Node.js 18 so Angular sees the correct version
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
           node-version: '18.x'
 
-      # 3) Initialize CodeQL
+      # 3) Initialize CodeQL, but skip "autobuild"
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v2
         with:
-          languages: ${{ matrix.language }}
+          languages: javascript
+          # This prevents CodeQL from trying to build your project
+          build: false
           queries: security-extended
 
-      # 4) Manually install, lint, and build (instead of `autobuild`)
+      # 4) Manually install, lint, and build under Node 18
       - name: Install & Build
         run: |
-          # You can use `npm ci` for a clean install if package-lock.json exists
+          node --version
           npm install
           npm run lint:fix
           npm run build
@@ -48,4 +43,3 @@ jobs:
       # 5) Analyze with CodeQL
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
-
