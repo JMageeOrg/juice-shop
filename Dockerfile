@@ -3,7 +3,7 @@
 ##
 FROM node:18 as installer
 
-# Install build tools (python, make, g++) for native node modules
+# Install build tools for native modules (python3, make, g++)
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
@@ -13,14 +13,12 @@ RUN apt-get update && apt-get install -y \
 # Set our working directory
 WORKDIR /juice-shop
 
-# Copy package manifests first (for better caching of npm install)
+# Copy package manifests first (for better caching)
 COPY package*.json ./
 
-# Use npm ci for a clean, reproducible install, and --legacy-peer-deps if you have peer conflicts
-# Combine with --unsafe-perm and --loglevel silly for debugging
-RUN npm ci --unsafe-perm --legacy-peer-deps --loglevel silly || \
-    (echo "npm ci failed – falling back to npm install" && \
-     npm install --unsafe-perm --legacy-peer-deps --loglevel silly)
+# Install all dependencies (including dev) so we can run the Angular build.
+# Since you don't have a package-lock.json, we use npm install.
+RUN npm install --unsafe-perm --legacy-peer-deps --loglevel silly
 
 # Copy the rest of the source code
 COPY . /juice-shop
@@ -44,39 +42,38 @@ RUN rm data/chatbot/botDefaultTrainingData.json || true
 RUN rm ftp/legal.md || true
 RUN rm i18n/*.json || true
 
-
 ##
 # 2) Production Runtime Stage
 ##
 FROM gcr.io/distroless/nodejs:18
 
-# Optional ARGs (labels) for image metadata
+# Optional ARGs for metadata
 ARG BUILD_DATE
 ARG VCS_REF
 LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
-    org.opencontainers.image.title="OWASP Juice Shop" \
-    org.opencontainers.image.description="Probably the most modern and sophisticated insecure web application" \
-    org.opencontainers.image.authors="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
-    org.opencontainers.image.vendor="Open Web Application Security Project" \
-    org.opencontainers.image.documentation="https://help.owasp-juice.shop" \
-    org.opencontainers.image.licenses="MIT" \
-    org.opencontainers.image.version="15.0.0" \
-    org.opencontainers.image.url="https://owasp-juice.shop" \
-    org.opencontainers.image.source="https://github.com/juice-shop/juice-shop" \
-    org.opencontainers.image.revision=$VCS_REF \
-    org.opencontainers.image.created=$BUILD_DATE
+      org.opencontainers.image.title="OWASP Juice Shop" \
+      org.opencontainers.image.description="Probably the most modern and sophisticated insecure web application" \
+      org.opencontainers.image.authors="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
+      org.opencontainers.image.vendor="Open Web Application Security Project" \
+      org.opencontainers.image.documentation="https://help.owasp-juice.shop" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.version="15.0.0" \
+      org.opencontainers.image.url="https://owasp-juice.shop" \
+      org.opencontainers.image.source="https://github.com/juice-shop/juice-shop" \
+      org.opencontainers.image.revision=$VCS_REF \
+      org.opencontainers.image.created=$BUILD_DATE
 
-# Same working directory as the build stage
+# Set the working directory (same as the build stage)
 WORKDIR /juice-shop
 
-# Copy everything from the build stage, preserving ownership for user 65532
+# Copy everything from the build stage, preserving ownership for non-root user
 COPY --from=installer --chown=65532:0 /juice-shop .
 
-# Use a non-root user from distroless
+# Run as non-root user from the distroless image
 USER 65532
 
-# Expose port 3000 by default
+# Expose port 3000
 EXPOSE 3000
 
-# Start the Node app
+# Start the application
 CMD ["/juice-shop/build/app.js"]
