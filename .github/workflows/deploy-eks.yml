@@ -13,8 +13,24 @@ jobs:
       # 1. Check out the source code
       - name: Check out the repository
         uses: actions/checkout@v3
+        
+    # 2. Set up Node 18 (so Angular CLI works)
+      - name: Use Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.x'
 
-      # 2. Configure AWS credentials (pull from GitHub Secrets)
+      # 3. Install dependencies, lint, and build (modify the commands as needed)
+      - name: Install dependencies
+        run: npm install
+
+      - name: Lint
+        run: npm run lint:fix  # or `npm run lint` if you don't want to auto-fix
+
+      - name: Build
+        run: npm run build
+        
+      # 4. Configure AWS credentials (pull from GitHub Secrets)
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -22,7 +38,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1  # Update if you use a different region
 
-      # 3. (Optional) Assume a specific IAM role if needed
+      # 5. (Optional) Assume a specific IAM role if needed
       #    If not needed, remove this step.
       - name: Assume IAM role
         if: ${{ env.AWS_ROLE_TO_ASSUME != '' }}
@@ -34,29 +50,29 @@ jobs:
           export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
           export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
 
-      # 4. Install kubectl
+      # 6. Install kubectl
       - name: Install kubectl
         run: |
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/kubectl
 
-      # 5. Update kubeconfig to point to your EKS cluster
+      # 7. Update kubeconfig to point to your EKS cluster
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --region us-east-1 --name YOUR_CLUSTER_NAME
 
-      # 6. Build Docker image
+      # 8. Build Docker image
       - name: Build Docker image
         run: |
           docker build -t juice-shop:latest .
 
-      # 7. Log in to Amazon ECR
+      # 9. Log in to Amazon ECR
       - name: Log in to ECR
         run: |
           aws ecr get-login-password --region us-east-1 | \
             docker login --username AWS --password-stdin jm-lab
 
-      # 8. Tag and push image to Amazon ECR
+      # 10. Tag and push image to Amazon ECR
       - name: Tag and push Docker image
         run: |
           # Use SHA or another tag you prefer
@@ -65,7 +81,7 @@ jobs:
           docker tag juice-shop:latest jm-lab/juiceshop:$IMAGE_TAG:$IMAGE_TAG
           docker push jm-lab/juiceshop:$IMAGE_TAG
 
-      # 9. Deploy to EKS by updating the existing Kubernetes Deployment
+      # 11. Deploy to EKS by updating the existing Kubernetes Deployment
       - name: Deploy to EKS
         run: |
           # Example: update the 'juice-shop' container in a 'juice-shop' deployment
