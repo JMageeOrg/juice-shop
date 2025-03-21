@@ -23,12 +23,12 @@ jobs:
       # 1. Check out the repository
       - name: Check out the repository
         uses: actions/checkout@v3
-
+        
       # 2. Set up Node.js 18 (if needed for npm tasks)
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
-          node-version: '18.x'
+          node-version: "18.x"
 
       # 3. Install dependencies and build frontend dependencies
       - name: Install dependencies
@@ -52,41 +52,36 @@ jobs:
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/kubectl
 
-      # 6. Reset old kubeconfig if it exists
+      # 6. Reset kubeconfig to remove any old configuration
       - name: Reset kubeconfig
         run: rm -f $HOME/.kube/config
 
-      # 7. Update kubeconfig to point to your EKS cluster
+      # 7. Update kubeconfig to point to your EKS cluster (replace YOUR_CLUSTER_NAME)
       - name: Update kubeconfig
-        run: aws eks update-kubeconfig --region us-east-1 --name jmlab-eks-cluster
+        run: aws eks update-kubeconfig --region us-east-1 --name YOUR_CLUSTER_NAME
 
-      # 8. Set the current kubeconfig context to use the user "github-eks-deploy"
-      - name: Set kubeconfig context user
-        run: |
-          CURRENT_CONTEXT=$(kubectl config current-context)
-          echo "Setting current context ($CURRENT_CONTEXT) user to github-eks-deploy"
-          kubectl config set-context "$CURRENT_CONTEXT" --user=github-eks-deploy
+      # (Removed the step that manually sets the kubeconfig context user)
 
-      # 9. Build Docker image (using your Dockerfile)
+      # 8. Build Docker image (using your Dockerfile)
       - name: Build Docker image
         run: docker build -t juice-shop:latest .
 
-      # 10. Log in to Amazon ECR (replace with your account's registry)
+      # 9. Log in to Amazon ECR (replace with your fully qualified registry)
       - name: Log in to ECR
         run: |
           aws ecr get-login-password --region us-east-1 | \
             docker login --username AWS --password-stdin 285653935315.dkr.ecr.us-east-1.amazonaws.com
 
-      # 11. Tag and push Docker image to ECR
+      # 10. Tag and push Docker image to ECR
       - name: Tag and push Docker image
         run: |
           IMAGE_TAG=${{ github.sha }}
-          docker tag juice-shop:latest 285653935315.dkr.ecr.us-east-1.amazonaws.com/jm-lab/juiceshop:$IMAGE_TAG
-          docker push 285653935315.dkr.ecr.us-east-1.amazonaws.com/jm-lab/juiceshop:$IMAGE_TAG
+          docker tag juice-shop:latest 285653935315.dkr.ecr.us-east-1.amazonaws.com/juiceshop:$IMAGE_TAG
+          docker push 285653935315.dkr.ecr.us-east-1.amazonaws.com/juiceshop:$IMAGE_TAG
 
-      # 12. Deploy to EKS by updating the Kubernetes Deployment
+      # 11. Deploy to EKS by updating the Kubernetes Deployment in the "jm-lab" namespace
       - name: Deploy to EKS
         run: |
           IMAGE_TAG=${{ github.sha }}
           kubectl set image deployment/juice-shop -n jm-lab \
-            juice-shop=285653935315.dkr.ecr.us-east-1.amazonaws.com/jm-lab/juiceshop:$IMAGE_TAG
+            juice-shop=285653935315.dkr.ecr.us-east-1.amazonaws.com/juiceshop:$IMAGE_TAG
