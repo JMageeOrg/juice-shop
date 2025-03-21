@@ -20,63 +20,64 @@ jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     steps:
-      # 1. Check out the source code
+      # 1) Check out the source code
       - name: Check out the repository
         uses: actions/checkout@v3
-        
-      # 2. Set up Node 18 (if you need Node for build steps)
+
+      # 2) Set up Node.js 18 (only needed if you have npm/Node build steps)
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
           node-version: '18.x'
 
-      # 3. Install dependencies, then build (modify commands as needed)
+      # 3) Install and build steps (adjust as needed for your project)
       - name: Install dependencies
         run: |
           npm install --save-dev typescript@^4.9.5
           cd frontend
           npm install --legacy-peer-deps
-        
-      # 4. Configure AWS credentials (pull from GitHub Secrets)
-      #    IAM user: github-eks-deploy
-      #    ARN: arn:aws:iam::285653935315:user/github-eks-deploy
+
+      # 4) Configure AWS credentials using static keys (no assume-role, no audience)
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1  # Adjust if your resources are in another region
+          aws-region: us-east-1  # change if your cluster/ECR is in a different region
 
-      # 5. Install kubectl
+      # 5) Install kubectl
       - name: Install kubectl
         run: |
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/kubectl
 
-      # 6. Update kubeconfig to point to your EKS cluster
+      # 6) Update kubeconfig to point to your EKS cluster
+      #    Replace 'my-eks-cluster' with your actual cluster name
       - name: Update kubeconfig
-        run: aws eks update-kubeconfig --region us-east-1 --name YOUR_CLUSTER_NAME
+        run: aws eks update-kubeconfig --region us-east-1 --name jmlab-eks-cluster
 
-      # 7. Build Docker image
+      # 7) Build Docker image
       - name: Build Docker image
         run: |
           docker build -t juice-shop:latest .
 
-      # 8. Log in to Amazon ECR
+      # 8) Log in to Amazon ECR
       - name: Log in to ECR
         run: |
           aws ecr get-login-password --region us-east-1 | \
             docker login --username AWS --password-stdin jm-lab
 
-      # 9. Tag and push image to Amazon ECR
+      # 9) Tag and push Docker image to ECR
+      #    If your ECR repository is named something else, change 'jm-lab/juiceshop'
       - name: Tag and push Docker image
         run: |
           IMAGE_TAG=${{ github.sha }}
           docker tag juice-shop:latest jm-lab/juiceshop:$IMAGE_TAG
           docker push jm-lab/juiceshop:$IMAGE_TAG
 
-      # 10. Deploy to EKS by updating the existing Kubernetes Deployment
+      # 10) Deploy to EKS by updating an existing Deployment
+      #     Replace 'juice-shop' with the name of your Kubernetes Deployment if different
       - name: Deploy to EKS
         run: |
           IMAGE_TAG=${{ github.sha }}
