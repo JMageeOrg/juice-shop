@@ -44,31 +44,35 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      # 5. Install kubectl
+   # 5. Install kubectl
       - name: Install kubectl
         run: |
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/kubectl
 
-      # 6. Ensure kubeconfig directory exists
-      - name: Create kubeconfig directory
-        run: mkdir -p $HOME/.kube
+      # 6. Reset any old kubeconfig file
+      - name: Reset kubeconfig
+        run: rm -f $HOME/.kube/config
 
-      # 7. Update kubeconfig to point to your EKS cluster
+      # 7. Update kubeconfig to point to your EKS cluster (replace YOUR_CLUSTER_NAME)
       - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig --region us-east-1 --name jmlab-eks-cluster
           echo "Kubeconfig (minified):"
           kubectl config view --minify
 
-      # 8. Debug: Fetch token details to verify authentication
+      # 8. Set the KUBECONFIG environment variable explicitly for subsequent kubectl commands
+      - name: Set KUBECONFIG environment variable
+        run: echo "KUBECONFIG=$HOME/.kube/config" >> $GITHUB_ENV
+
+      # 9. Debug: Fetch token details to verify authentication
       - name: Debug get-token
         run: |
-          echo "Fetching token for cluster jmlab-eks-cluster..."
+          echo "Fetching token for cluster jmlab-eks-cluster"
           aws eks get-token --cluster-name jmlab-eks-cluster --region us-east-1
 
-      # 9. Verify cluster connectivity (should list pods)
+      # 10. Verify cluster connectivity (should list pods)
       - name: Verify cluster connectivity
         run: kubectl get pods --all-namespaces
 
