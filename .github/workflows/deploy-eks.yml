@@ -1,5 +1,14 @@
 name: Deploy to EKS
 
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+      version:
+        description: 'App version to deploy'
+        required: false
 on:
   push:
     branches: [ "main" ]
