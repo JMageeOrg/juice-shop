@@ -5,33 +5,32 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Deployment environment'
+        description: "Deployment environment"
         required: true
-        default: 'production'
+        default: "production"
       version:
-        description: 'App version to deploy'
+        description: "App version to deploy"
         required: false
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Check out the source code
+      # 1. Check out the repository
       - name: Check out the repository
         uses: actions/checkout@v3
-        
+
       # 2. Set up Node.js 18 (if needed for npm tasks)
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
           node-version: '18.x'
 
-      # 3. Install dependencies and build the project (adjust as needed)
+      # 3. Install dependencies and build frontend dependencies
       - name: Install dependencies
         run: |
           npm install --save-dev typescript@^4.9.5
@@ -53,44 +52,39 @@ jobs:
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/kubectl
 
-     # 4. Update kubeconfig to point to your EKS cluster
-      - name: Update kubeconfig
-        run: |
-          rm -f $HOME/.kube/config
-          aws eks update-kubeconfig --region us-east-1 --name jmlab-eks-cluster
+      # 6. Reset old kubeconfig if it exists
+      - name: Reset kubeconfig
+        run: rm -f $HOME/.kube/config
 
-      # 5a. Update the current kubeconfig context to use the user "github-eks-deploy"
+      # 7. Update kubeconfig to point to your EKS cluster
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --region us-east-1 --name jmlab-eks-cluster
+
+      # 8. Set the current kubeconfig context to use the user "github-eks-deploy"
       - name: Set kubeconfig context user
         run: |
           CURRENT_CONTEXT=$(kubectl config current-context)
           echo "Setting current context ($CURRENT_CONTEXT) user to github-eks-deploy"
           kubectl config set-context "$CURRENT_CONTEXT" --user=github-eks-deploy
 
-      # 6a. Rename kubeconfig user to your IAM user "github-eks-deploy"
-      - name: Rename kubeconfig user
-        run: |
-          CURRENT_USER=$(kubectl config view -o jsonpath='{.users[0].name}')
-          echo "Renaming kubeconfig user from $CURRENT_USER to github-eks-deploy"
-          kubectl config rename-user "$CURRENT_USER" github-eks-deploy
-
-      # 7. Build Docker image (using your Dockerfile)
+      # 9. Build Docker image (using your Dockerfile)
       - name: Build Docker image
         run: docker build -t juice-shop:latest .
 
-      # 8. Log in to Amazon ECR using the fully qualified registry endpoint
+      # 10. Log in to Amazon ECR (replace with your account's registry)
       - name: Log in to ECR
         run: |
           aws ecr get-login-password --region us-east-1 | \
             docker login --username AWS --password-stdin 285653935315.dkr.ecr.us-east-1.amazonaws.com
 
-      # 9. Tag and push Docker image to ECR
+      # 11. Tag and push Docker image to ECR
       - name: Tag and push Docker image
         run: |
           IMAGE_TAG=${{ github.sha }}
           docker tag juice-shop:latest 285653935315.dkr.ecr.us-east-1.amazonaws.com/juiceshop:$IMAGE_TAG
           docker push 285653935315.dkr.ecr.us-east-1.amazonaws.com/juiceshop:$IMAGE_TAG
 
-      # 10. Deploy to EKS by updating the existing Kubernetes Deployment
+      # 12. Deploy to EKS by updating the Kubernetes Deployment
       - name: Deploy to EKS
         run: |
           IMAGE_TAG=${{ github.sha }}
