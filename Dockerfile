@@ -16,9 +16,11 @@ WORKDIR /juice-shop
 # Copy package manifests first (for better caching of npm install)
 COPY package*.json ./
 
-# Install all dependencies (including dev) so we can run the Angular build
-# Use --unsafe-perm to allow root to run scripts, and --loglevel silly for debugging
-RUN npm install --unsafe-perm --loglevel silly
+# Use npm ci for a clean, reproducible install, and --legacy-peer-deps if you have peer conflicts
+# Combine with --unsafe-perm and --loglevel silly for debugging
+RUN npm ci --unsafe-perm --legacy-peer-deps --loglevel silly || \
+    (echo "npm ci failed – falling back to npm install" && \
+     npm install --unsafe-perm --legacy-peer-deps --loglevel silly)
 
 # Copy the rest of the source code
 COPY . /juice-shop
