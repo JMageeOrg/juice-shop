@@ -1,7 +1,7 @@
 ##
 # 1) Build/Installer Stage
 ##
-FROM node:18-bullseye as installer
+FROM node:18 as installer
 
 # Install build tools (python3, make, g++) for native modules
 RUN apt-get update && apt-get install -y \
@@ -13,11 +13,8 @@ RUN apt-get update && apt-get install -y \
 # Set our working directory
 WORKDIR /juice-shop
 
-# Copy package manifests first (for better caching)
+# Copy package manifests first (for caching)
 COPY package*.json ./
-
-# Upgrade npm to version 11.2.0
-RUN npm install -g npm@11.2.0
 
 # Install all dependencies (including dev) so we can run the Angular build.
 RUN npm install --unsafe-perm --legacy-peer-deps --force --loglevel silly
@@ -29,20 +26,17 @@ COPY . /juice-shop
 RUN npm run build && ls -la /juice-shop/build
 
 # Remove dev dependencies to minimize final image size
-RUN npm prune --omit=dev
-RUN npm dedupe
+RUN npm prune --omit=dev && npm dedupe
 
 # Remove unneeded folders and files
-RUN rm -rf frontend/node_modules \
-           frontend/.angular \
-           frontend/src/assets
-RUN mkdir logs
-RUN chown -R 65532 logs
-RUN chgrp -R 0 ftp/ frontend/dist/ logs/ data/ i18n/
-RUN chmod -R g=u ftp/ frontend/dist/ logs/ data/ i18n/
-RUN rm data/chatbot/botDefaultTrainingData.json || true
-RUN rm ftp/legal.md || true
-RUN rm i18n/*.json || true
+RUN rm -rf frontend/node_modules frontend/.angular frontend/src/assets && \
+    mkdir logs && \
+    chown -R 65532 logs && \
+    chgrp -R 0 ftp/ frontend/dist/ logs/ data/ i18n/ && \
+    chmod -R g=u ftp/ frontend/dist/ logs/ data/ i18n/ && \
+    rm data/chatbot/botDefaultTrainingData.json || true && \
+    rm ftp/legal.md || true && \
+    rm i18n/*.json || true
 
 ##
 # 2) Production Runtime Stage
@@ -65,8 +59,17 @@ LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
       org.opencontainers.image.revision=$VCS_REF \
       org.opencontainers.image.created=$BUILD_DATE
 
-# Set the working directory
+# Set working directory
 WORKDIR /juice-shop
 
 # Copy everything from the build stage, preserving ownership for non-root user
-COPY --
+COPY --from=installer --chown=65532:0 /juice-shop .
+
+# Use a non-root user provided by the distroless image
+USER 65532
+
+# Expose port 3000 (ensure your application listens on port 3000)
+EXPOSE 3000
+
+# Start the Node application. If necessary, you can call node explicitly.
+CMD ["/juice-shop/build/app.js"]
