@@ -17,8 +17,8 @@ WORKDIR /juice-shop
 COPY package*.json ./
 
 # Install all dependencies (including dev) so we can run the Angular build.
-# We run the command in bash.
-RUN bash -c "npm install --unsafe-perm --legacy-peer-deps --loglevel silly"
+# We only use --unsafe-perm and --loglevel silly for debugging.
+RUN npm install --unsafe-perm --loglevel silly
 
 # Copy the rest of the source code
 COPY . /juice-shop
@@ -66,11 +66,11 @@ WORKDIR /juice-shop
 # Copy built application from the installer stage, preserving ownership for non-root user
 COPY --from=installer --chown=65532:0 /juice-shop .
 
-# Switch to a non-root user provided by distroless
+# Use non-root user provided by distroless
 USER 65532
 
 # Expose port 3000 (ensure your application listens on port 3000)
 EXPOSE 3000
 
-# Start the Node app (if needed, change to ["node", "/juice-shop/build/app.js"])
+# Start the Node app. If necessary, you can change this to ["node", "/juice-shop/build/app.js"]
 CMD ["/juice-shop/build/app.js"]
