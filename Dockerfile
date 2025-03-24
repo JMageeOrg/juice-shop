@@ -13,12 +13,17 @@ RUN apt-get update && apt-get install -y \
 # Set our working directory
 WORKDIR /juice-shop
 
-# Copy package manifests first (for caching)
+# Copy package manifests first (for better caching)
 COPY package*.json ./
 
+# Upgrade npm to the latest version (optional; if this still fails, you may remove this step)
+# RUN npm install -g npm@latest
+
 # Install all dependencies (including dev) so we can run the Angular build.
-# Using --unsafe-perm and --legacy-peer-deps for installation.
-RUN npm install --unsafe-perm --legacy-peer-deps --loglevel silly
+# If npm install fails, print the contents of the debug log(s) and exit.
+RUN npm install --unsafe-perm --legacy-peer-deps --loglevel silly || \
+    (echo "npm install failed, printing logs:" && \
+     find /root/.npm/_logs -type f -name "*-debug-0.log" -exec cat {} \; && exit 1)
 
 # Copy the rest of the source code
 COPY . /juice-shop
@@ -60,17 +65,17 @@ LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
       org.opencontainers.image.revision=$VCS_REF \
       org.opencontainers.image.created=$BUILD_DATE
 
-# Set working directory
+# Set our working directory
 WORKDIR /juice-shop
 
 # Copy built application from the installer stage, preserving ownership for non-root user
 COPY --from=installer --chown=65532:0 /juice-shop .
 
-# Switch to non-root user provided by distroless
+# Use a non-root user provided by distroless
 USER 65532
 
 # Expose port 3000 (ensure your application listens on port 3000)
 EXPOSE 3000
 
-# Start the Node app. If needed, you can call "node" explicitly.
+# Start the Node app. If necessary, use "node" explicitly.
 CMD ["/juice-shop/build/app.js"]
