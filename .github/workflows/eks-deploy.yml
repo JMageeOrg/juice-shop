@@ -90,8 +90,8 @@ jobs:
       - name: Tag and push Docker image
         run: |
           IMAGE_TAG=${{ github.sha }}
-          docker tag juice-shop:latest 285653935315.dkr.ecr.us-east-1.amazonaws.com/jm-lab/juiceshop:$IMAGE_TAG
-          docker push 285653935315.dkr.ecr.us-east-1.amazonaws.com/jm-lab/juiceshop:$IMAGE_TAG
+           docker tag juice-shop:latest 285653935315.dkr.ecr.us-east-1.amazonaws.com/jm-lab/juiceshop:${{ github.sha }}
+          docker push 285653935315.dkr.ecr.us-east-1.amazonaws.com/jm-lab/juiceshop:${{ github.sha }}
 
       # 13. Deploy to EKS by updating the Kubernetes Deployment in the "jm-lab" namespace
       - name: Deploy to EKS
