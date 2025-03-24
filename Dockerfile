@@ -13,8 +13,11 @@ RUN apt-get update && apt-get install -y \
 # Set our working directory
 WORKDIR /juice-shop
 
-# Copy package manifests first (for better caching)
+# Copy package manifests first (for caching)
 COPY package*.json ./
+
+# Upgrade npm to the latest recommended version (11.2.0)
+RUN npm install -g npm@11.2.0
 
 # Install all dependencies (including dev) so we can run the Angular build.
 # Using --unsafe-perm, --legacy-peer-deps, and --force for installation.
@@ -23,7 +26,7 @@ RUN npm install --unsafe-perm --legacy-peer-deps --force --loglevel silly
 # Copy the rest of the source code
 COPY . /juice-shop
 
-# Build the application (frontend & server) and list the build directory for debugging
+# Build the application (frontend & server)
 RUN npm run build && ls -la /juice-shop/build
 
 # Remove dev dependencies to minimize final image size
@@ -47,7 +50,7 @@ RUN rm i18n/*.json || true
 ##
 FROM gcr.io/distroless/nodejs:18
 
-# Optional ARGs for image metadata
+# Optional ARGs for metadata
 ARG BUILD_DATE
 ARG VCS_REF
 LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
@@ -66,7 +69,7 @@ LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
 # Set our working directory (same as in the build stage)
 WORKDIR /juice-shop
 
-# Copy everything from the build stage, preserving ownership for non-root user
+# Copy built application from the installer stage, preserving ownership
 COPY --from=installer --chown=65532:0 /juice-shop .
 
 # Use a non-root user from distroless
@@ -75,5 +78,5 @@ USER 65532
 # Expose port 3000 by default (ensure your application listens on port 3000)
 EXPOSE 3000
 
-# Start the Node app (adjust if needed; for example, use "node" explicitly)
+# Start the Node app (adjust if needed; you can use "node" explicitly if required)
 CMD ["/juice-shop/build/app.js"]
