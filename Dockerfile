@@ -1,37 +1,39 @@
 ##
-# 1) Build/Installer Stage using Yarn
+# 1) Build/Installer Stage
 ##
 FROM node:18-bullseye as installer
 
-# Install build tools (python3, make, g++) for native modules
+# Install build tools for native modules
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
   && rm -rf /var/lib/apt/lists/*
 
-# Set our working directory
+# Set working directory
 WORKDIR /juice-shop
 
-# Copy package manifests first for caching. 
-# (Make sure you commit a yarn.lock file to your repo; if you don't have one, Yarn will generate one.)
-COPY package.json yarn.lock* ./
+# Copy package manifests first (for caching)
+COPY package.json ./
+# Optionally, if you have one, copy package-lock.json or yarn.lock:
+# COPY package-lock.json ./
 
-# Install Yarn globally
-RUN npm install -g yarn
+# Set environment variables to force legacy peer dependency resolution and disable update notifications.
+ENV npm_config_legacy_peer_deps=true
+ENV npm_config_update_notifier=false
+ENV npm_config_loglevel=verbose
 
-# Install all dependencies using Yarn. --frozen-lockfile ensures consistency.
-RUN yarn install --frozen-lockfile --network-concurrency 1 --verbose
+# Install dependencies
+RUN npm install --unsafe-perm
 
 # Copy the rest of the source code
 COPY . /juice-shop
 
-# Build the application (both frontend & server) and list the build directory for debugging
-RUN yarn run build && ls -la /juice-shop/build
+# Build the application (frontend & server) and list the build directory for debugging
+RUN npm run build && ls -la /juice-shop/build
 
-# (Optional) Remove dev dependencies – Yarn doesn't have a direct equivalent of npm prune,
-# so in production we rely on a production install in the runtime stage.
-RUN yarn install --production --frozen-lockfile
+# Remove dev dependencies and dedupe
+RUN npm prune --omit=dev && npm dedupe
 
 # Remove unneeded folders and files to reduce image size
 RUN rm -rf frontend/node_modules frontend/.angular frontend/src/assets && \
@@ -64,17 +66,19 @@ LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
       org.opencontainers.image.revision=$VCS_REF \
       org.opencontainers.image.created=$BUILD_DATE
 
-# Set working directory
+# Set working directory in production stage
 WORKDIR /juice-shop
 
-# Copy the built application from the installer stage
+# Copy built application from installer stage, preserving ownership for non-root user
 COPY --from=installer --chown=65532:0 /juice-shop .
 
 # Switch to a non-root user provided by distroless
 USER 65532
 
-# Expose port 3000 (ensure your application listens on port 3000)
+# Expose port 3000 (make sure your app listens on port 3000)
 EXPOSE 3000
 
-# Start the Node app. (Adjust if needed, e.g., ["node", "/juice-shop/build/app.js"])
+# Start the Node application.
+# If your app.js file requires Node explicitly, you may change the CMD to:
+# CMD ["node", "/juice-shop/build/app.js"]
 CMD ["/juice-shop/build/app.js"]
