@@ -1,7 +1,7 @@
 ##
 # 1) Build/Installer Stage
 ##
-FROM node:18-bullseye as installer
+FROM node:18 as installer
 
 # Install build tools (python3, make, g++) for native modules
 RUN apt-get update && apt-get install -y \
@@ -10,41 +10,44 @@ RUN apt-get update && apt-get install -y \
     g++ \
   && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+# Set our working directory
 WORKDIR /juice-shop
 
-# Copy package manifests first for caching
+# Copy package manifests first (for caching)
 COPY package*.json ./
 
-# Install all dependencies (including dev) while ignoring postinstall scripts.
-# This bypasses the failing "postinstall" in your package.json.
-RUN npm install --unsafe-perm --ignore-scripts --legacy-peer-deps --loglevel verbose
+# Install all dependencies (including dev) so we can run the Angular build.
+# We add --unsafe-perm, --legacy-peer-deps, and --force along with verbose logging.
+RUN npm install --unsafe-perm --legacy-peer-deps --force --loglevel silly
 
 # Copy the rest of the source code
 COPY . /juice-shop
 
-# Now manually run the build step as defined in your package.json ("build": "npm run build:frontend && npm run build:server")
-RUN npm run build && ls -la /juice-shop/build
+# Build the application (frontend & server)
+RUN npm run build
 
-# Remove dev dependencies to minimize final image size and dedupe modules
-RUN npm prune --omit=dev && npm dedupe
+# Remove dev dependencies to minimize final image size
+RUN npm prune --omit=dev
+RUN npm dedupe
 
-# Clean up unneeded folders and files
-RUN rm -rf frontend/node_modules frontend/.angular frontend/src/assets && \
-    mkdir logs && \
-    chown -R 65532 logs && \
-    chgrp -R 0 ftp/ frontend/dist/ logs/ data/ i18n/ && \
-    chmod -R g=u ftp/ frontend/dist/ logs/ data/ i18n/ && \
-    rm data/chatbot/botDefaultTrainingData.json || true && \
-    rm ftp/legal.md || true && \
-    rm i18n/*.json || true
+# Remove unneeded folders and files
+RUN rm -rf frontend/node_modules \
+           frontend/.angular \
+           frontend/src/assets
+RUN mkdir logs
+RUN chown -R 65532 logs
+RUN chgrp -R 0 ftp/ frontend/dist/ logs/ data/ i18n/
+RUN chmod -R g=u ftp/ frontend/dist/ logs/ data/ i18n/
+RUN rm data/chatbot/botDefaultTrainingData.json || true
+RUN rm ftp/legal.md || true
+RUN rm i18n/*.json || true
 
 ##
 # 2) Production Runtime Stage
 ##
 FROM gcr.io/distroless/nodejs:18
 
-# Optional build metadata
+# Optional ARGs (metadata)
 ARG BUILD_DATE
 ARG VCS_REF
 LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
@@ -60,17 +63,17 @@ LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
       org.opencontainers.image.revision=$VCS_REF \
       org.opencontainers.image.created=$BUILD_DATE
 
-# Set working directory
+# Use the same working directory as in the build stage
 WORKDIR /juice-shop
 
-# Copy built application from the installer stage, preserving ownership for non-root user
+# Copy built application from the installer stage
 COPY --from=installer --chown=65532:0 /juice-shop .
 
-# Use the non-root user provided by distroless
+# Switch to a non-root user (provided by the distroless image)
 USER 65532
 
-# Expose port 3000 (ensure your application listens on port 3000)
+# Expose port 3000 by default
 EXPOSE 3000
 
-# Start the Node application. If necessary, use "node" explicitly (e.g. ["node", "/juice-shop/build/app.js"])
+# Start the Node app
 CMD ["/juice-shop/build/app.js"]
