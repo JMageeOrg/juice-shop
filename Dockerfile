@@ -3,7 +3,7 @@
 ##
 FROM node:18-bullseye as installer
 
-# Install build tools for native modules
+# Install build tools (python3, make, g++) for native modules
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
@@ -13,29 +13,23 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /juice-shop
 
-# Copy package manifests first (for caching)
-COPY package.json ./
-# Optionally, if you have one, copy package-lock.json or yarn.lock:
-# COPY package-lock.json ./
+# Copy package manifests first for caching
+COPY package*.json ./
 
-# Set environment variables to force legacy peer dependency resolution and disable update notifications.
-ENV npm_config_legacy_peer_deps=true
-ENV npm_config_update_notifier=false
-ENV npm_config_loglevel=verbose
-
-# Install dependencies
-RUN npm install --unsafe-perm
+# Install all dependencies (including dev) while ignoring postinstall scripts.
+# This bypasses the failing "postinstall" in your package.json.
+RUN npm install --unsafe-perm --ignore-scripts --legacy-peer-deps --loglevel verbose
 
 # Copy the rest of the source code
 COPY . /juice-shop
 
-# Build the application (frontend & server) and list the build directory for debugging
+# Now manually run the build step as defined in your package.json ("build": "npm run build:frontend && npm run build:server")
 RUN npm run build && ls -la /juice-shop/build
 
-# Remove dev dependencies and dedupe
+# Remove dev dependencies to minimize final image size and dedupe modules
 RUN npm prune --omit=dev && npm dedupe
 
-# Remove unneeded folders and files to reduce image size
+# Clean up unneeded folders and files
 RUN rm -rf frontend/node_modules frontend/.angular frontend/src/assets && \
     mkdir logs && \
     chown -R 65532 logs && \
@@ -66,19 +60,17 @@ LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
       org.opencontainers.image.revision=$VCS_REF \
       org.opencontainers.image.created=$BUILD_DATE
 
-# Set working directory in production stage
+# Set working directory
 WORKDIR /juice-shop
 
-# Copy built application from installer stage, preserving ownership for non-root user
+# Copy built application from the installer stage, preserving ownership for non-root user
 COPY --from=installer --chown=65532:0 /juice-shop .
 
-# Switch to a non-root user provided by distroless
+# Use the non-root user provided by distroless
 USER 65532
 
-# Expose port 3000 (make sure your app listens on port 3000)
+# Expose port 3000 (ensure your application listens on port 3000)
 EXPOSE 3000
 
-# Start the Node application.
-# If your app.js file requires Node explicitly, you may change the CMD to:
-# CMD ["node", "/juice-shop/build/app.js"]
+# Start the Node application. If necessary, use "node" explicitly (e.g. ["node", "/juice-shop/build/app.js"])
 CMD ["/juice-shop/build/app.js"]
