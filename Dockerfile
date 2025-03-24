@@ -13,20 +13,22 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /juice-shop
 
-# Copy package manifests first (for caching)
+# Copy the root package manifests for caching
 COPY package*.json ./
 
-# Install all dependencies but ignore scripts (to bypass the failing postinstall)
-RUN npm install --unsafe-perm --ignore-scripts --legacy-peer-deps --loglevel verbose
+# Install root dependencies but ignore scripts (to bypass the failing postinstall)
+RUN npm install --unsafe-perm --legacy-peer-deps --ignore-scripts --loglevel verbose
 
 # Copy the rest of the source code
 COPY . /juice-shop
 
-# Manually run the build commands defined in package.json
-# (This runs "npm run build:frontend && npm run build:server")
+# Manually install frontend dependencies (this should install @angular/cli into frontend/node_modules)
+RUN cd frontend && npm install --legacy-peer-deps --loglevel verbose
+
+# Run the build script (which in your package.json runs "npm run build:frontend && npm run build:server")
 RUN npm run build
 
-# Remove dev dependencies to minimize final image size, then dedupe
+# Remove dev dependencies and dedupe
 RUN npm prune --omit=dev && npm dedupe
 
 # Clean up unneeded folders and files
@@ -63,15 +65,15 @@ LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
 # Set working directory
 WORKDIR /juice-shop
 
-# Copy the built application from the installer stage
+# Copy built application from the installer stage
 COPY --from=installer --chown=65532:0 /juice-shop .
 
-# Switch to a non-root user provided by distroless
+# Use a non-root user provided by the distroless image
 USER 65532
 
 # Expose port 3000 (your application should listen on port 3000)
 EXPOSE 3000
 
-# Start the application.
-# If needed, change to ["node", "/juice-shop/build/app.js"] if the script isn't executable directly.
+# Start the Node application
+# If your app.js file isn't executable directly, change this to ["node", "/juice-shop/build/app.js"]
 CMD ["/juice-shop/build/app.js"]
