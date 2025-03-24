@@ -98,4 +98,4 @@ jobs:
         run: |
           IMAGE_TAG=${{ github.sha }}
           kubectl set image deployment/juice-shop -n jm-lab \
-            juice-shop=285653935315.dkr.ecr.us-east-1.amazonaws.com/jmlab/juiceshop:${{ github.sha }}
+            juice-shop=285653935315.dkr.ecr.us-east-1.amazonaws.com/jm-lab/juiceshop:${{ github.sha }}
