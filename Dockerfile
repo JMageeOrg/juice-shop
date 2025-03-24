@@ -16,11 +16,8 @@ WORKDIR /juice-shop
 # Copy package manifests first (for caching)
 COPY package*.json ./
 
-# Upgrade npm to the latest version and show version
-RUN npm install -g npm@latest && npm --version
-
 # Install all dependencies (including dev) so we can run the Angular build.
-# We add --unsafe-perm and --legacy-peer-deps, along with verbose logging.
+# Using --unsafe-perm and --legacy-peer-deps for installation.
 RUN npm install --unsafe-perm --legacy-peer-deps --loglevel silly
 
 # Copy the rest of the source code
@@ -47,7 +44,7 @@ RUN rm -rf frontend/node_modules frontend/.angular frontend/src/assets && \
 ##
 FROM gcr.io/distroless/nodejs:18
 
-# Optional metadata
+# Optional build metadata
 ARG BUILD_DATE
 ARG VCS_REF
 LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
@@ -63,17 +60,17 @@ LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
       org.opencontainers.image.revision=$VCS_REF \
       org.opencontainers.image.created=$BUILD_DATE
 
-# Set the working directory
+# Set working directory
 WORKDIR /juice-shop
 
-# Copy everything from the build stage, preserving ownership for non-root user
+# Copy built application from the installer stage, preserving ownership for non-root user
 COPY --from=installer --chown=65532:0 /juice-shop .
 
-# Use non-root user provided by distroless
+# Switch to non-root user provided by distroless
 USER 65532
 
 # Expose port 3000 (ensure your application listens on port 3000)
 EXPOSE 3000
 
-# Start the application. If necessary, use "node" explicitly.
+# Start the Node app. If needed, you can call "node" explicitly.
 CMD ["/juice-shop/build/app.js"]
