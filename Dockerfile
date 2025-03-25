@@ -1,3 +1,4 @@
+
 ##
 # 1) Build/Installer Stage
 ##
@@ -23,10 +24,10 @@ RUN npm install --unsafe-perm --ignore-scripts --legacy-peer-deps --loglevel ver
 # Copy the rest of the source code
 COPY . /juice-shop
 
-# Run the build command; remove '|| true' to surface build errors.
+# Run the build command; removed '|| true' so that build errors are not masked.
 RUN npm run build
 
-# Optionally, verify that the build output exists (remove after debugging)
+# (Optional) Debug step: list the build directory to verify output exists.
 # RUN ls -la /juice-shop/build
 
 # Remove dev dependencies to minimize final image size, then dedupe.
