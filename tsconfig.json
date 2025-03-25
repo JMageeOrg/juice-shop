@@ -10,6 +10,7 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "noEmitOnError": false,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "lib": [
@@ -17,7 +18,7 @@
       "dom"
     ]
   },
-  "include" : [
+  "include": [
     "cypress/**/*.ts",
     "data/**/*.ts",
     "lib/**/*.ts",
