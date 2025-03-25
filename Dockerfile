@@ -3,31 +3,33 @@
 ##
 FROM node:18-bullseye as installer
 
-# Install build tools for native modules
+# Install build tools (python3, make, g++) for native modules
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
   && rm -rf /var/lib/apt/lists/*
 
+# Set working directory
 WORKDIR /juice-shop
 
-# Copy package manifests (for caching)
+# Copy package manifests first (for caching)
 COPY package*.json ./
 
-# Install dependencies and ignore scripts to bypass the failing postinstall
+# Install all dependencies (including dev) so we can run the Angular build.
+# Here we run npm install with --ignore-scripts to bypass postinstall issues.
 RUN npm install --unsafe-perm --ignore-scripts --legacy-peer-deps --loglevel verbose
 
 # Copy the rest of the source code
 COPY . /juice-shop
 
-# Run the build command, but force the step to succeed even if there are type errors
+# Run the build command; force success even if there are type errors.
 RUN npm run build || true
 
-# Remove dev dependencies and dedupe to minimize final image size
+# Remove dev dependencies to minimize final image size, then dedupe.
 RUN npm prune --omit=dev && npm dedupe
 
-# Remove unneeded folders and files to reduce image size
+# Remove unneeded folders and files
 RUN rm -rf frontend/node_modules frontend/.angular frontend/src/assets && \
     mkdir logs && \
     chown -R 65532 logs && \
@@ -58,16 +60,17 @@ LABEL maintainer="Bjoern Kimminich <bjoern.kimminich@owasp.org>" \
       org.opencontainers.image.revision=$VCS_REF \
       org.opencontainers.image.created=$BUILD_DATE
 
+# Set working directory
 WORKDIR /juice-shop
 
-# Copy built application from installer stage
+# Copy the built application from the installer stage, preserving ownership for non-root user
 COPY --from=installer --chown=65532:0 /juice-shop .
 
-# Use non-root user from distroless
+# Use a non-root user provided by the distroless image
 USER 65532
 
-# Expose port 3000 (ensure your app listens on port 3000)
+# Expose port 3000 (ensure your application listens on port 3000)
 EXPOSE 3000
 
-# Start the Node application (adjust if needed; you might need "node /juice-shop/build/app.js")
+# Start the Node app (if necessary, you may change this to ["node", "/juice-shop/build/app.js"])
 CMD ["/juice-shop/build/app.js"]
