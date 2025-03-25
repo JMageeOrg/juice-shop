@@ -50,7 +50,7 @@
   "scripts": {
     "build": "npm run build:frontend && npm run build:server",
     "build:frontend": "cd frontend && npm install --legacy-peer-deps && npx ng build --aot --configuration production --output-hashing=none --vendor-chunk=true --source-map=false",
-    "build:server": "tsc",
+    "build:server": "tsc --noEmitOnError false",
     "cypress:open": "cypress open",
     "frisby": "nyc --report-dir=./build/reports/coverage/api-tests jest --silent --runInBand --forceExit",
     "postinstall": "cd frontend && npm install --legacy-peer-deps && cd .. && npm run build:frontend && npm run build:server",
